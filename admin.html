@@ -139,6 +139,7 @@
 
         // 3. Guardar en Firebase
         database.ref('evento').set({
+            sessionId: Date.now(),
             configuracion: {
                 totalJugadores: totalJugadores,
                 numEquipos: numEquipos,
