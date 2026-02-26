@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pantalla Gigante - Equipos</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        body {
+            background-color: #121212; /* Negro profundo */
+            color: #ffffff;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .text-warning { color: #ffc107 !important; }
+
+        /* Contenedor de las columnas de equipos */
+        #teams-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        /* Tarjeta de cada equipo */
+        .team-card {
+            background-color: #1e1e1e;
+            border: 2px solid #333;
+            border-radius: 12px;
+            flex: 1 1 250px; /* Tamaño mínimo de columna */
+            max-width: 400px;
+            min-height: 300px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .team-header {
+            background-color: #ffc107;
+            color: #000;
+            font-size: 1.5rem;
+            font-weight: 900;
+            text-align: center;
+            padding: 15px;
+            text-transform: uppercase;
+        }
+
+        .team-body {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* Caja con fondo para destacar a cada jugador */
+        .player-box {
+            background-color: #2b2b2b;
+            border-left: 5px solid #ffc107;
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        @keyframes popIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Estado vacío */
+        .empty-state {
+            color: #555;
+            text-align: center;
+            font-style: italic;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container-fluid">
+        <h1>DESAFÍO <span class="text-warning">ACTIVACIÓN</span></h1>
+        
+        <div id="teams-container">
+            <h3 class="text-secondary text-center w-100 mt-5">Esperando a que el panel de control inicie el evento...</h3>
+        </div>
+    </div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script>
+    // Configuración real de Firebase
+    const firebaseConfig = {
+        apiKey: "AIzaSyCgwypR7eC6w3U8eUUvuRBKGjSkUtw95CQ",
+        authDomain: "teamassignerapp.firebaseapp.com",
+        databaseURL: "https://teamassignerapp-default-rtdb.firebaseio.com",
+        projectId: "teamassignerapp",
+        storageBucket: "teamassignerapp.firebasestorage.app",
+        messagingSenderId: "443890843534",
+        appId: "1:443890843534:web:0049c943485c677af12edf"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // Escuchar cambios en tiempo real
+    const eventoRef = database.ref('evento');
+    
+    eventoRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        const container = document.getElementById('teams-container');
+        
+        if (!data || !data.configuracion) {
+            return; // Aún no hay datos
+        }
+
+        const numEquipos = data.configuracion.numEquipos;
+        const participantes = data.participantes || {};
+
+        // Limpiar el contenedor
+        container.innerHTML = '';
+
+        // Crear una tarjeta por cada equipo
+        for (let i = 1; i <= numEquipos; i++) {
+            // Crear la estructura de la tarjeta
+            const card = document.createElement('div');
+            card.className = 'team-card';
+            
+            const header = document.createElement('div');
+            header.className = 'team-header';
+            header.innerText = `EQUIPO ${i}`;
+            
+            const body = document.createElement('div');
+            body.className = 'team-body';
+            body.id = `equipo-${i}-body`; // ID único para inyectar nombres
+            
+            card.appendChild(header);
+            card.appendChild(body);
+            container.appendChild(card);
+
+            // Revisar si hay participantes en este equipo
+            const keyEquipo = `equipo_${i}`;
+            if (participantes[keyEquipo]) {
+                const jugadores = Object.values(participantes[keyEquipo]);
+                jugadores.forEach(nombre => {
+                    const playerBox = document.createElement('div');
+                    playerBox.className = 'player-box';
+                    playerBox.innerText = nombre;
+                    body.appendChild(playerBox);
+                });
+            } else {
+                const empty = document.createElement('div');
+                empty.className = 'empty-state';
+                empty.innerText = "Esperando jugadores...";
+                body.appendChild(empty);
+            }
+        }
+    });
+</script>
+
+</body>
+</html>
