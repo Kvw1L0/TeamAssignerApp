@@ -153,37 +153,46 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
-    // 🚨 REEMPLAZA CON TUS LLAVES DE FIREBASE 🚨
+    // Configuración real de Firebase
     const firebaseConfig = {
-
-    apiKey: "AIzaSyCgwypR7eC6w3U8eUUvuRBKGjSkUtw95CQ",
-
-    authDomain: "teamassignerapp.firebaseapp.com",
-
-    databaseURL: "https://teamassignerapp-default-rtdb.firebaseio.com",
-
-    projectId: "teamassignerapp",
-
-    storageBucket: "teamassignerapp.firebasestorage.app",
-
-    messagingSenderId: "443890843534",
-
-    appId: "1:443890843534:web:0049c943485c677af12edf"
-
-  };
+        apiKey: "AIzaSyCgwypR7eC6w3U8eUUvuRBKGjSkUtw95CQ",
+        authDomain: "teamassignerapp.firebaseapp.com",
+        databaseURL: "https://teamassignerapp-default-rtdb.firebaseio.com",
+        projectId: "teamassignerapp",
+        storageBucket: "teamassignerapp.firebasestorage.app",
+        messagingSenderId: "443890843534",
+        appId: "1:443890843534:web:0049c943485c677af12edf"
+    };
 
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-    // Comprobar Anti-Trampas (si ya tiene un equipo guardado en este celular)
-    window.onload = function() {
-        const equipoGuardado = localStorage.getItem('equipoAsignado');
-        const nombreGuardado = localStorage.getItem('nombreJugador');
+    let sesionActualDelServidor = null;
+
+    // 1. Escuchar la sesión actual del servidor
+    database.ref('evento/sessionId').on('value', (snapshot) => {
+        sesionActualDelServidor = snapshot.val();
         
-        if (equipoGuardado && nombreGuardado) {
-            mostrarResultado(equipoGuardado, nombreGuardado);
+        // Revisamos qué sesión tiene guardada el celular en su memoria
+        const sesionGuardada = localStorage.getItem('sesionJugada');
+        
+        // Si hay una sesión en el servidor y es diferente a la guardada, es un juego nuevo
+        if (sesionActualDelServidor && sesionActualDelServidor != sesionGuardada) {
+            localStorage.removeItem('equipoAsignado');
+            localStorage.removeItem('nombreJugador');
+            // Asegurarse de mostrar la pantalla de ingreso si se reinició
+            document.getElementById('screen-result').style.display = 'none';
+            document.getElementById('screen-loading').style.display = 'none';
+            document.getElementById('screen-input').style.display = 'block';
+        } else {
+            // Si es la misma sesión, verificamos si ya tenía equipo asignado
+            const equipoGuardado = localStorage.getItem('equipoAsignado');
+            const nombreGuardado = localStorage.getItem('nombreJugador');
+            if (equipoGuardado && nombreGuardado) {
+                mostrarResultado(equipoGuardado, nombreGuardado);
+            }
         }
-    };
+    });
 
     function solicitarEquipo() {
         const nombreInput = document.getElementById('playerName').value.trim();
@@ -197,7 +206,6 @@
         document.getElementById('screen-input').style.display = 'none';
         document.getElementById('screen-loading').style.display = 'block';
 
-        // Lógica para tomar un cupo de Firebase
         const eventoRef = database.ref('evento');
         
         eventoRef.once('value', (snapshot) => {
@@ -216,20 +224,20 @@
             // Extraemos el primer cupo de la lista mezclada
             let miEquipo = cupos.shift(); 
 
-            // Actualizamos la base de datos con la lista reducida y agregamos al participante
+            // Actualizamos la base de datos
             let actualizaciones = {};
             actualizaciones['/evento/cupos_disponibles'] = cupos;
             
-            // Usamos un ID único basado en el tiempo para que no se sobreescriban los nombres
             const idUnico = Date.now();
             actualizaciones['/evento/participantes/equipo_' + miEquipo + '/' + idUnico] = nombreInput;
 
             database.ref().update(actualizaciones).then(() => {
                 // Generar un poco de suspenso artificial (2 segundos)
                 setTimeout(() => {
-                    // Guardar en la memoria del celular
+                    // Guardar en la memoria del celular incluyendo el ID de la sesión actual
                     localStorage.setItem('equipoAsignado', miEquipo);
                     localStorage.setItem('nombreJugador', nombreInput);
+                    localStorage.setItem('sesionJugada', sesionActualDelServidor);
                     
                     mostrarResultado(miEquipo, nombreInput);
                 }, 2000);
