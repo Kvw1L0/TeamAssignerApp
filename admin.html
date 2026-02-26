@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Control - Activación</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        body {
+            background-color: #121212; /* Negro profundo */
+            color: #ffffff;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+        }
+        .admin-card {
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .text-warning { color: #ffc107 !important; } /* Amarillo Bootstrap */
+        .btn-warning {
+            background-color: #ffc107;
+            border-color: #ffc107;
+            color: #000;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .btn-warning:hover {
+            background-color: #e0a800;
+            border-color: #d39e00;
+            color: #000;
+        }
+        .form-control {
+            background-color: #2b2b2b;
+            border: 1px solid #444;
+            color: #fff;
+        }
+        .form-control:focus {
+            background-color: #333;
+            border-color: #ffc107;
+            color: #fff;
+            box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.25);
+        }
+        #qrcode-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="admin-card p-5 text-center">
+                <h2 class="mb-4">CONTROL <span class="text-warning">PANEL</span></h2>
+                
+                <div class="mb-3 text-start">
+                    <label class="form-label text-secondary">Total de Participantes</label>
+                    <input type="number" id="inputJugadores" class="form-control form-control-lg text-center" value="20">
+                </div>
+                
+                <div class="mb-4 text-start">
+                    <label class="form-label text-secondary">Cantidad de Equipos</label>
+                    <input type="number" id="inputEquipos" class="form-control form-control-lg text-center" value="4">
+                </div>
+                
+                <button class="btn btn-warning btn-lg w-100 mb-4" onclick="iniciarEvento()">
+                    Generar QR & Iniciar
+                </button>
+
+                <div id="qrcode-container" style="display: none;">
+                    <div id="qrcode"></div>
+                    <p class="text-dark mt-2 mb-0 fw-bold small">ESCANEA PARA PARTICIPAR</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<script>
+    // 🚨 REEMPLAZA ESTO CON LA CONFIGURACIÓN QUE TE DIO FIREBASE 🚨
+    const firebaseConfig = {
+        apiKey: "TU_API_KEY",
+        authDomain: "tu-proyecto.firebaseapp.com",
+        databaseURL: "https://tu-proyecto-default-rtdb.firebaseio.com",
+        projectId: "tu-proyecto",
+        storageBucket: "tu-proyecto.appspot.com",
+        messagingSenderId: "123456789",
+        appId: "1:123456789:web:abcdefg"
+    };
+
+    // Inicializar Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    function iniciarEvento() {
+        const totalJugadores = parseInt(document.getElementById('inputJugadores').value);
+        const numEquipos = parseInt(document.getElementById('inputEquipos').value);
+
+        if (totalJugadores < numEquipos) {
+            alert("Debe haber más jugadores que equipos.");
+            return;
+        }
+
+        // 1. Crear la bolsa de cupos equilibrados
+        let bolsaCupos = [];
+        for (let i = 0; i < totalJugadores; i++) {
+            // Asignamos números de equipo del 1 al N
+            bolsaCupos.push((i % numEquipos) + 1);
+        }
+
+        // 2. Barajar la bolsa al azar (Algoritmo Fisher-Yates)
+        for (let i = bolsaCupos.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [bolsaCupos[i], bolsaCupos[j]] = [bolsaCupos[j], bolsaCupos[i]];
+        }
+
+        // 3. Guardar en Firebase
+        database.ref('evento').set({
+            configuracion: {
+                totalJugadores: totalJugadores,
+                numEquipos: numEquipos,
+                estado: "activo"
+            },
+            cupos_disponibles: bolsaCupos,
+            participantes: {} // Aquí se irán guardando los nombres más adelante
+        }).then(() => {
+            // 4. Mostrar el QR si se guardó correctamente
+            mostrarQR();
+        }).catch((error) => {
+            alert("Error al conectar con Firebase: " + error);
+        });
+    }
+
+    function mostrarQR() {
+        const qrContainerDiv = document.getElementById('qrcode-container');
+        const qrDiv = document.getElementById('qrcode');
+        
+        qrContainerDiv.style.display = 'inline-block';
+        qrDiv.innerHTML = ""; // Limpiar QR anterior
+
+        // URL a la que apuntará el QR (La ruta de tu celular. Por ahora pondremos un texto de prueba)
+        // Más adelante, cambiaremos esto por el link real de tu "jugador.html" subido a internet
+        const urlJugador = "https://tu-dominio.com/jugador.html"; 
+
+        new QRCode(qrDiv, {
+            text: urlJugador,
+            width: 200,
+            height: 200,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+    }
+</script>
+
+</body>
+</html>
